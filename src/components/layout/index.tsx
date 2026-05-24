@@ -3,18 +3,14 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Button } from './ui';
-
-// ============================================
-// LOGO COMPONENT
-// ============================================
+import { motion } from 'framer-motion';
+import { Button } from '@/components/ui';
 
 interface LogoProps {
   size?: 'sm' | 'md' | 'lg';
 }
 
-export const Logo: React.FC<LogoProps> = ({ size = 'md' }) => {
+const Logo: React.FC<LogoProps> = ({ size = 'md' }) => {
   const sizeStyles = {
     sm: 'text-lg gap-2',
     md: 'text-xl gap-3',
@@ -23,7 +19,6 @@ export const Logo: React.FC<LogoProps> = ({ size = 'md' }) => {
 
   return (
     <Link href="/" className={`flex items-center font-family font-medium ${sizeStyles[size]} text-[var(--color-charcoal-primary)] no-underline`}>
-      {/* Custom Logo Mark - Stylized "AV" monogram */}
       <svg width="32" height="32" viewBox="0 0 32 32" fill="none" className="flex-shrink-0">
         <rect width="32" height="32" rx="8" fill="var(--color-ember-orange)" />
         <path
@@ -34,14 +29,10 @@ export const Logo: React.FC<LogoProps> = ({ size = 'md' }) => {
           strokeLinejoin="round"
         />
       </svg>
-      <span className="hidden sm:block">Avax Ventures</span>
+      <span className="hidden sm:block">VenturesSea</span>
     </Link>
   );
 };
-
-// ============================================
-// NAVIGATION LINK
-// ============================================
 
 interface NavLinkProps {
   href: string;
@@ -72,10 +63,6 @@ const NavLink: React.FC<NavLinkProps> = ({ href, children, isActive }) => {
   );
 };
 
-// ============================================
-// MAIN NAVIGATION BAR
-// ============================================
-
 interface NavBarProps {
   isAuthenticated?: boolean;
   walletAddress?: string | null;
@@ -83,7 +70,7 @@ interface NavBarProps {
   onDisconnect?: () => void;
 }
 
-export const NavBar: React.FC<NavBarProps> = ({
+const NavBar: React.FC<NavBarProps> = ({
   isAuthenticated = false,
   walletAddress = null,
   onConnect,
@@ -104,10 +91,7 @@ export const NavBar: React.FC<NavBarProps> = ({
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 h-16 bg-[var(--color-warm-canvas)] shadow-[inset_0_-1px_0_rgba(0,0,0,0.04)]">
       <div className="max-w-[var(--page-max-width)] mx-auto px-8 h-full flex items-center justify-between">
-        {/* Logo */}
         <Logo size="md" />
-
-        {/* Center Navigation Links */}
         <div className="hidden md:flex items-center gap-2">
           {navLinks.map((link) => (
             <NavLink key={link.href} href={link.href} isActive={pathname === link.href}>
@@ -115,8 +99,6 @@ export const NavBar: React.FC<NavBarProps> = ({
             </NavLink>
           ))}
         </div>
-
-        {/* Right Actions */}
         <div className="flex items-center gap-3">
           {isAuthenticated && walletAddress ? (
             <div className="flex items-center gap-3">
@@ -140,8 +122,6 @@ export const NavBar: React.FC<NavBarProps> = ({
               </Button>
             </>
           )}
-
-          {/* Mobile Menu Button */}
           <button className="md:hidden p-2 text-[var(--color-graphite)] hover:text-[var(--color-charcoal-primary)]">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
@@ -153,11 +133,7 @@ export const NavBar: React.FC<NavBarProps> = ({
   );
 };
 
-// ============================================
-// FOOTER COMPONENT
-// ============================================
-
-export const Footer: React.FC = () => {
+const Footer: React.FC = () => {
   const footerLinks = {
     Product: [
       { label: 'Explore Ideas', href: '/ideas' },
@@ -180,15 +156,12 @@ export const Footer: React.FC = () => {
     <footer className="bg-[var(--color-warm-canvas)] border-t border-[var(--color-stone-surface)]">
       <div className="max-w-[var(--page-max-width)] mx-auto px-8 py-16">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-12">
-          {/* Brand Column */}
           <div className="md:col-span-1">
             <Logo size="lg" />
             <p className="mt-4 text-sm text-[var(--color-ash)] leading-relaxed">
               Empowering innovation through community-driven funding and decentralized governance.
             </p>
           </div>
-
-          {/* Link Columns */}
           {Object.entries(footerLinks).map(([title, links]) => (
             <div key={title}>
               <h3 className="font-inter font-semibold text-sm text-[var(--color-charcoal-primary)] mb-4">
@@ -209,11 +182,9 @@ export const Footer: React.FC = () => {
             </div>
           ))}
         </div>
-
-        {/* Bottom Bar */}
         <div className="mt-12 pt-8 border-t border-[var(--color-stone-surface)] flex flex-col md:flex-row justify-between items-center gap-4">
           <p className="text-sm text-[var(--color-fog)]">
-            © {new Date().getFullYear()} Avax Ventures. All rights reserved.
+            © {new Date().getFullYear()} VenturesSea. All rights reserved.
           </p>
           <div className="flex items-center gap-4">
             <a href="#" className="text-[var(--color-fog)] hover:text-[var(--color-charcoal-primary)] transition-colors">
@@ -238,15 +209,11 @@ export const Footer: React.FC = () => {
   );
 };
 
-// ============================================
-// PAGE WRAPPER
-// ============================================
-
 interface PageWrapperProps {
   children: React.ReactNode;
 }
 
-export const PageWrapper: React.FC<PageWrapperProps> = ({ children }) => {
+const PageWrapper: React.FC<PageWrapperProps> = ({ children }) => {
   return (
     <main className="pt-16 min-h-screen bg-[var(--color-warm-canvas)]">
       <div className="max-w-[1200px] mx-auto px-8 py-12">
@@ -256,17 +223,13 @@ export const PageWrapper: React.FC<PageWrapperProps> = ({ children }) => {
   );
 };
 
-// ============================================
-// SECTION COMPONENT
-// ============================================
-
 interface SectionProps {
   children: React.ReactNode;
   className?: string;
   id?: string;
 }
 
-export const Section: React.FC<SectionProps> = ({ children, className = '', id }) => {
+const Section: React.FC<SectionProps> = ({ children, className = '', id }) => {
   return (
     <section id={id} className={`py-[140px] ${className}`}>
       <div className="max-w-[1200px] mx-auto px-8">
@@ -276,14 +239,4 @@ export const Section: React.FC<SectionProps> = ({ children, className = '', id }
   );
 };
 
-// ============================================
-// EXPORT ALL
-// ============================================
-
-export {
-  Logo,
-  NavBar,
-  Footer,
-  PageWrapper,
-  Section,
-};
+export { Logo, NavBar, Footer, PageWrapper, Section };

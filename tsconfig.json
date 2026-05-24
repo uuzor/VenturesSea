@@ -1,6 +1,10 @@
 {
   "compilerOptions": {
-    "lib": ["es2023", "dom", "dom.iterable"],
+    "lib": [
+      "es2023",
+      "dom",
+      "dom.iterable"
+    ],
     "module": "esnext",
     "target": "es2017",
     "skipLibCheck": true,
@@ -17,9 +21,28 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"]
-    }
+      "@/*": [
+        "./src/*"
+      ]
+    },
+    "allowJs": true,
+    "strict": false,
+    "esModuleInterop": true
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules", "contracts", "test", "scripts", "ignition", "cache", "artifacts", "node.log"]
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "contracts",
+    "test",
+    "scripts",
+    "ignition",
+    "cache",
+    "artifacts",
+    "node.log"
+  ]
 }
