@@ -195,6 +195,15 @@ contract ConfidentialIdeaToken is ERC20, Initializable {
         if (amount == 0) revert InvalidAmount();
 
         _mint(to, amount);
+
+        // Keep encrypted state in sync
+        euint128 amountEnc = FHE.asEuint128(amount);
+        _encryptedBalances[to] = FHE.add(_encryptedBalances[to], amountEnc);
+        FHE.allowThis(_encryptedBalances[to]);
+        FHE.allow(_encryptedBalances[to], to);
+        _encryptedTotalSupply = FHE.add(_encryptedTotalSupply, amountEnc);
+        FHE.allowThis(_encryptedTotalSupply);
+
         emit ConfidentialMint(to, amount);
     }
 

@@ -194,8 +194,8 @@ contract ConfidentialRevenueReport is Initializable {
         // Store encrypted revenue
         euint64 rev = FHE.asEuint64(encryptedRevenue);
         _encryptedRevenue[reportId] = rev;
-
-        // Allow public decryption for dispute resolution
+        FHE.allowThis(_encryptedRevenue[reportId]);
+        FHE.allow(_encryptedRevenue[reportId], msg.sender);  // builder can prove submission
 
         emit ReportSubmitted(reportId, msg.sender, periodStart, periodEnd, reportHash);
         emit ConfidentialRevenueSubmitted(reportId);
@@ -270,9 +270,6 @@ contract ConfidentialRevenueReport is Initializable {
             }
         }
 
-        // Store verification commitment
-        euint64 expected = FHE.asEuint64(encryptedExpectedAmount);
-        // The actual verification happens off-chain via threshold decryption
     }
 
     /// @notice Raise a dispute against a revenue report.
