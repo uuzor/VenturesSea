@@ -14,6 +14,11 @@
     "deploy": "hardhat run scripts/deploy.ts --network localhost"
   },
   "dependencies": {
+    "@cofhe/hardhat-plugin": "^0.5.2",
+    "@cofhe/sdk": "^0.5.2",
+    "@fhenixprotocol/contracts": "^0.3.1",
+    "@openzeppelin/contracts": "^5.4.0",
+    "@openzeppelin/contracts-upgradeable": "^5.4.0",
     "@rainbow-me/rainbowkit": "^2.2.11",
     "@supabase/supabase-js": "^2.39.0",
     "@tanstack/react-query": "^5.100.14",
@@ -26,20 +31,25 @@
     "wagmi": "^2.19.5"
   },
   "devDependencies": {
-    "@nomicfoundation/hardhat-ethers": "^4.0.12",
-    "@nomicfoundation/hardhat-ignition": "^3.1.6",
-    "@nomicfoundation/hardhat-network-helpers": "^3.0.9",
-    "@nomicfoundation/hardhat-toolbox-viem": "^5.0.6",
+    "@nomicfoundation/hardhat-ethers": "^3.0.0",
+    "@nomicfoundation/hardhat-ignition": "^0.15.0",
+    "@nomicfoundation/hardhat-network-helpers": "^1.0.0",
+    "@nomicfoundation/hardhat-toolbox-viem": "^3.0.0",
     "@types/node": "^20.10.0",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
     "autoprefixer": "^10.4.16",
-    "chai": "^6.2.2",
-    "hardhat": "^3.5.1",
-    "mocha": "^11.7.6",
+    "chai": "^5.1.0",
+    "hardhat": "^2.22.0",
+    "mocha": "^11.0.0",
     "postcss": "^8.4.32",
     "tailwindcss": "^3.4.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.3.0"
+  },
+  "overrides": {
+    "@nomicfoundation/hardhat-ethers": {
+      "hardhat": "$hardhat"
+    }
   }
 }
