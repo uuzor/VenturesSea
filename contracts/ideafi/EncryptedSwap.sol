@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.25;
 
-import {FHE, euint64, ebool, inEuint64} from "@fhenixprotocol/contracts/FHE.sol";
+import {FHE, euint8, euint16, euint32, euint64, euint128, InEuint64, ebool, eaddress} from "@fhenixprotocol/cofhe-contracts/FHE.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
@@ -24,6 +24,7 @@ import "./ThresholdDecryptor.sol";
  *      comparisons and swap matching.
  */
 contract EncryptedSwap is Initializable {
+    using FHE for *;
     using SafeERC20 for IERC20;
 
     // ── Types ─────────────────────────────────────────────────────────────────
