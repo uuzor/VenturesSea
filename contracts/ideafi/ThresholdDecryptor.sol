@@ -62,8 +62,8 @@ contract ThresholdDecryptor is Initializable {
     /// @notice List of guardian addresses
     address[] public guardians;
 
-    /// @notice Mapping of guardian addresses to their index (for removal)
-    mapping(address => uint256) public guardianIndex;
+    /// @notice Mapping of guardian addresses to boolean (clean approach)
+    mapping(address => bool) public guardianStatus;
 
     /// @notice Mapping of request ID to DecryptRequest
     mapping(uint256 => DecryptRequest) public decryptRequests;
@@ -136,8 +136,7 @@ contract ThresholdDecryptor is Initializable {
     }
 
     modifier onlyGuardian() {
-        require(guardianIndex[msg.sender] != 0 || guardians[guardianIndex[msg.sender] - 1] == msg.sender, 
-            "ThresholdDecryptor: not a guardian");
+        require(guardianStatus[msg.sender], "ThresholdDecryptor: not a guardian");
         _;
     }
 
@@ -179,6 +178,22 @@ contract ThresholdDecryptor is Initializable {
         requestCount = 0;
     }
 
+    // ── Internal Guardian Management ───────────────────────────────────────────
+
+    /**
+     * @notice Internal function to add a guardian
+     * @param guardian Address to add
+     */
+    function _addGuardian(address guardian) internal {
+        require(guardian != address(0), "ThresholdDecryptor: zero guardian");
+        require(!guardianStatus[guardian], "ThresholdDecryptor: already a guardian");
+        
+        guardianStatus[guardian] = true;
+        guardians.push(guardian);
+        
+        emit GuardianAdded(guardian);
+    }
+
     // ── Guardian Management ─────────────────────────────────────────────────────
 
     /**
@@ -197,17 +212,18 @@ contract ThresholdDecryptor is Initializable {
      */
     function removeGuardian(address guardian) external onlyOwner {
         require(guardians.length > minApprovals, "ThresholdDecryptor: cannot remove, minimum reached");
-        require(guardianIndex[guardian] != 0 || guardians[guardianIndex[guardian] - 1] == guardian, 
-            "ThresholdDecryptor: not a guardian");
+        require(guardianStatus[guardian], "ThresholdDecryptor: not a guardian");
         
-        uint256 index = guardianIndex[guardian] - 1;
+        guardianStatus[guardian] = false;
         
-        // Replace with last element
-        address lastGuardian = guardians[guardians.length - 1];
-        guardians[index] = lastGuardian;
-        guardianIndex[lastGuardian] = index + 1;
-        guardians.pop();
-        guardianIndex[guardian] = 0;
+        // Find and replace with last element
+        for (uint256 i = 0; i < guardians.length; i++) {
+            if (guardians[i] == guardian) {
+                guardians[i] = guardians[guardians.length - 1];
+                guardians.pop();
+                break;
+            }
+        }
         
         emit GuardianRemoved(guardian);
     }
@@ -448,8 +464,8 @@ contract ThresholdDecryptor is Initializable {
      * @param account Address to check
      * @return Whether the address is a guardian
      */
-    function isGuardian(address account) external view returns (bool) {
-        return guardianIndex[account] != 0 || (guardians.length > 0 && guardians[0] == account);
+    function checkGuardian(address account) external view returns (bool) {
+        return guardianStatus[account];
     }
 
     /**
@@ -489,16 +505,5 @@ contract ThresholdDecryptor is Initializable {
         );
     }
 
-    // ── Internal Helpers ───────────────────────────────────────────────────────
-
-    function _addGuardian(address guardian) internal {
-        require(guardian != address(0), "ThresholdDecryptor: zero guardian");
-        require(guardianIndex[guardian] == 0 && (guardians.length == 0 || guardians[0] != guardian), 
-            "ThresholdDecryptor: already a guardian");
-        
-        guardians.push(guardian);
-        guardianIndex[guardian] = guardians.length;
-        
-        emit GuardianAdded(guardian);
-    }
+    // ── End of Contract ───────────────────────────────────────────────────────
 }

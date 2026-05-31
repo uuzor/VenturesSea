@@ -92,6 +92,9 @@ contract EncryptedSwap is Initializable {
     /// @notice Fee-on-transfer tokens support flag
     bool public supportsFeeOnTransfer;
 
+    /// @notice Contract owner for access control
+    address public owner;
+
     // ── Events ─────────────────────────────────────────────────────────────────
 
     event OfferCreated(
@@ -145,6 +148,11 @@ contract EncryptedSwap is Initializable {
 
     // ── Modifiers ──────────────────────────────────────────────────────────────
 
+    modifier onlyOwner() {
+        require(msg.sender == owner, "EncryptedSwap: not owner");
+        _;
+    }
+
     modifier onlySupportedToken(address token) {
         require(supportedTokens[token], "EncryptedSwap: unsupported token");
         _;
@@ -159,14 +167,17 @@ contract EncryptedSwap is Initializable {
      * @param _protocolFeeBPS Protocol fee in basis points
      */
     function initialize(
+        address _owner,
         address _thresholdDecryptor,
         address _feeRecipient,
         uint256 _protocolFeeBPS
     ) public initializer {
+        require(_owner != address(0), "EncryptedSwap: zero owner");
         require(_thresholdDecryptor != address(0), "EncryptedSwap: zero decryptor");
         require(_feeRecipient != address(0), "EncryptedSwap: zero fee recipient");
         require(_protocolFeeBPS <= 1000, "EncryptedSwap: fee too high"); // Max 10%
 
+        owner = _owner;
         thresholdDecryptor = ThresholdDecryptor(_thresholdDecryptor);
         feeRecipient = _feeRecipient;
         protocolFeeBPS = _protocolFeeBPS;
@@ -179,28 +190,29 @@ contract EncryptedSwap is Initializable {
 
     /**
      * @notice Add a supported token to the whitelist
-     * @dev Only owner or authorized handler
+     * @dev Only owner can call
      * @param token Token address to add
      */
-    function addSupportedToken(address token) external {
+    function addSupportedToken(address token) external onlyOwner {
         require(token != address(0), "EncryptedSwap: zero token");
         supportedTokens[token] = true;
     }
 
     /**
      * @notice Remove a supported token from the whitelist
-     * @dev Only owner or authorized handler
+     * @dev Only owner can call
      * @param token Token address to remove
      */
-    function removeSupportedToken(address token) external {
+    function removeSupportedToken(address token) external onlyOwner {
         supportedTokens[token] = false;
     }
 
     /**
      * @notice Enable fee-on-transfer token support
+     * @dev Only owner can call
      * @param enabled True to enable, false to disable
      */
-    function setSupportsFeeOnTransfer(bool enabled) external {
+    function setSupportsFeeOnTransfer(bool enabled) external onlyOwner {
         supportsFeeOnTransfer = enabled;
     }
 
@@ -208,9 +220,10 @@ contract EncryptedSwap is Initializable {
 
     /**
      * @notice Update protocol fee recipient
+     * @dev Only owner can call
      * @param _feeRecipient New fee recipient
      */
-    function updateFeeRecipient(address _feeRecipient) external {
+    function updateFeeRecipient(address _feeRecipient) external onlyOwner {
         require(_feeRecipient != address(0), "EncryptedSwap: zero address");
         feeRecipient = _feeRecipient;
         emit FeeRecipientUpdated(_feeRecipient);
@@ -218,9 +231,10 @@ contract EncryptedSwap is Initializable {
 
     /**
      * @notice Update protocol fee
+     * @dev Only owner can call
      * @param _protocolFeeBPS New fee in basis points
      */
-    function updateProtocolFee(uint256 _protocolFeeBPS) external {
+    function updateProtocolFee(uint256 _protocolFeeBPS) external onlyOwner {
         require(_protocolFeeBPS <= 1000, "EncryptedSwap: fee too high");
         protocolFeeBPS = _protocolFeeBPS;
         emit ProtocolFeeUpdated(_protocolFeeBPS);
@@ -228,9 +242,10 @@ contract EncryptedSwap is Initializable {
 
     /**
      * @notice Update affiliate fee share
+     * @dev Only owner can call
      * @param _affiliateFeeShare New affiliate share in BPS
      */
-    function updateAffiliateFeeShare(uint256 _affiliateFeeShare) external {
+    function updateAffiliateFeeShare(uint256 _affiliateFeeShare) external onlyOwner {
         require(_affiliateFeeShare <= protocolFeeBPS, "EncryptedSwap: share exceeds fee");
         affiliateFeeShare = _affiliateFeeShare;
         emit AffiliateFeeShareUpdated(_affiliateFeeShare);
@@ -442,8 +457,10 @@ contract EncryptedSwap is Initializable {
         if (!offer.isActive) revert OfferNotActive();
         if (block.timestamp > offer.deadline) revert OfferExpired();
 
-        // Verify amounts are within bounds
-        uint256 remaining = decryptedAmountForOffer(offerHash) - filledAmounts[offerHash];
+        // SECURITY FIX: Use safe remaining calculation inline
+        uint256 remaining = offer.minFillAmount > filledAmounts[offerHash] 
+            ? offer.minFillAmount - filledAmounts[offerHash] 
+            : 0;
         require(amountA <= remaining, "EncryptedSwap: exceeds remaining");
 
         // Calculate fees
@@ -547,10 +564,14 @@ contract EncryptedSwap is Initializable {
         // Note: Encrypted amount comparison happens via FHE
         // For simplicity, match at current fill levels
 
-        uint256 matchAmount = min(
-            decryptedAmountForOffer(offerHashA) - filledAmounts[offerHashA],
-            decryptedAmountForOffer(offerHashB) - filledAmounts[offerHashB]
-        );
+        // SECURITY FIX: Use safe remaining calculation inline
+        uint256 remainingA = offerA.minFillAmount > filledAmounts[offerHashA]
+            ? offerA.minFillAmount - filledAmounts[offerHashA]
+            : 0;
+        uint256 remainingB = offerB.minFillAmount > filledAmounts[offerHashB]
+            ? offerB.minFillAmount - filledAmounts[offerHashB]
+            : 0;
+        uint256 matchAmount = remainingA < remainingB ? remainingA : remainingB;
 
         if (matchAmount > 0) {
             // Execute internal swap
@@ -567,12 +588,40 @@ contract EncryptedSwap is Initializable {
     }
 
     /**
-     * @notice Get decrypted amount for an offer
-     * @dev Placeholder for FHE decryption
+     * @notice Get encrypted amount for an offer
+     * @dev SECURITY FIX: Removed vulnerable function that returned type(uint256).max
+     *      which caused overflow in remaining calculation, allowing unlimited fills.
+     *      Actual encrypted amounts stored in offer.encryptedAmountA/B.
+     *      Decryption happens off-chain via ThresholdDecryptor.
+     * @param offerHash Hash of the offer
+     * @return amount The encrypted amount (0 placeholder - use events for actual amounts)
      */
-    function decryptedAmountForOffer(bytes32) public view returns (uint256) {
-        // Placeholder - actual implementation uses FHE runtime
-        return type(uint256).max;
+    function getEncryptedAmount(bytes32 offerHash) external view returns (uint256) {
+        SwapOffer storage offer = offers[offerHash];
+        require(offer.maker != address(0), "EncryptedSwap: offer not found");
+        // Return 0 as placeholder - actual encrypted amounts stored in offer.encryptedAmountA/B
+        // Decryption happens off-chain via ThresholdDecryptor
+        return 0;
+    }
+
+    /**
+     * @notice Get remaining fillable amount for an offer
+     * @dev SECURITY FIX: Now uses a safe calculation that doesn't depend on
+     *      the vulnerable decryptedAmountForOffer returning max uint.
+     * @param offerHash Hash of the offer
+     * @return remaining Remaining fillable amount
+     */
+    function getRemainingFillAmount(bytes32 offerHash) external view returns (uint256) {
+        // Use minFillAmount as a public cap for UX
+        // Actual remaining calculated from encrypted amounts (off-chain)
+        SwapOffer storage offer = offers[offerHash];
+        require(offer.maker != address(0), "EncryptedSwap: offer not found");
+        
+        // Return minFillAmount as remaining (capped for safety)
+        // In production, actual remaining = encryptedAmount - filledAmounts
+        return offer.minFillAmount > filledAmounts[offerHash] 
+            ? offer.minFillAmount - filledAmounts[offerHash] 
+            : 0;
     }
 
     // ── View Functions ────────────────────────────────────────────────────────────
@@ -602,7 +651,9 @@ contract EncryptedSwap is Initializable {
             offer.minFillAmount,
             offer.isActive,
             offer.deadline,
-            decryptedAmountForOffer(offerHash) - filledAmounts[offerHash]
+            offer.minFillAmount > filledAmounts[offerHash] 
+                ? offer.minFillAmount - filledAmounts[offerHash] 
+                : 0
         );
     }
 
@@ -636,7 +687,11 @@ contract EncryptedSwap is Initializable {
      * @return Remaining fillable amount
      */
     function getRemainingAmount(bytes32 offerHash) external view returns (uint256) {
-        return decryptedAmountForOffer(offerHash) - filledAmounts[offerHash];
+        SwapOffer storage offer = offers[offerHash];
+        require(offer.maker != address(0), "EncryptedSwap: offer not found");
+        return offer.minFillAmount > filledAmounts[offerHash] 
+            ? offer.minFillAmount - filledAmounts[offerHash] 
+            : 0;
     }
 
     // ── Internal Helpers ─────────────────────────────────────────────────────────

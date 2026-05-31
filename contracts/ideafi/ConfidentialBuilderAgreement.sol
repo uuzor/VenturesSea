@@ -66,7 +66,11 @@ contract ConfidentialBuilderAgreement is Initializable {
     bool public stakeRevealed;
 
     /// @notice Public reference for slashed amount (only meaningful after slash)
+    /// @dev This stores the ACTUAL MUSD amount, not basis points
     uint256 public slashedAmountPublic;
+
+    /// @notice The actual stake amount in MUSD tokens (set during stake)
+    uint256 public builderStakeAmountMUSD;
 
     // -----------------------------------------------------------------------
     // Events
@@ -205,6 +209,7 @@ contract ConfidentialBuilderAgreement is Initializable {
 
     /**
      * @notice Stake with plaintext amount (backward compatible).
+     * @param amount The actual MUSD amount to stake
      */
     function stake(uint256 amount) external {
         require(msg.sender == agreement.builder, "BuilderAgreement: not the builder");
@@ -218,6 +223,9 @@ contract ConfidentialBuilderAgreement is Initializable {
         euint64 amountEnc = FHE.asEuint64(amount);
         _encryptedStake = FHE.add(_encryptedStake, amountEnc);
 
+        // Track actual stake amount in MUSD (not basis points)
+        builderStakeAmountMUSD += amount;
+
         emit ConfidentialStakeDeposited(msg.sender, amount);
     }
 
@@ -228,6 +236,7 @@ contract ConfidentialBuilderAgreement is Initializable {
     /**
      * @notice Slash the builder and reveal stake for redistribution.
      * @dev When slashed, the stake becomes public and can be distributed to LPs.
+     *      Uses the actual MUSD amount that was staked, not basis points.
      */
     function slash() external onlyDAO {
         require(
@@ -235,18 +244,20 @@ contract ConfidentialBuilderAgreement is Initializable {
             "BuilderAgreement: agreement not ACTIVE"
         );
 
-        address  builder = agreement.builder;
-        uint256  builderStakeBps = agreement.builderStakeBps;
+        address builder = agreement.builder;
 
         agreement.status = AgreementStatus.SLASHED;
         stakeRevealed = true;
 
-        // Note: In production, we'd decrypt _encryptedStake and distribute
-        // For now, mark as revealed (actual distribution via separate call)
-        slashedAmountPublic = builderStakeBps; // Placeholder
+        // Use the actual staked MUSD amount, not basis points
+        slashedAmountPublic = builderStakeAmountMUSD;
+
+        // Transfer slashed stake to protocol treasury
+        if (slashedAmountPublic > 0) {
+            IERC20(musd).safeTransfer(protocolTreasury, slashedAmountPublic);
+        }
 
         emit StakeSlashed(builder, slashedAmountPublic);
-        emit SlashDistributed(builder, builderStakeBps);
     }
 
     /**
@@ -270,22 +281,24 @@ contract ConfidentialBuilderAgreement is Initializable {
 
     /**
      * @notice Return stake to builder (on successful completion).
+     * @dev Returns the actual staked MUSD amount, not basis points.
      */
     function returnStake() external onlyDAO {
         require(
             agreement.status == AgreementStatus.ACTIVE,
             "BuilderAgreement: agreement not ACTIVE"
         );
+        require(!stakeRevealed, "BuilderAgreement: stake already revealed");
 
-        // Transfer stake back to builder
-        // In production: decrypt _encryptedStake and transfer
-        uint256 stakeToReturn = slashedAmountPublic; // Placeholder
+        // Use the actual staked MUSD amount
+        uint256 stakeToReturn = builderStakeAmountMUSD;
 
         if (stakeToReturn > 0) {
             IERC20(musd).safeTransfer(agreement.builder, stakeToReturn);
         }
 
         _encryptedStake = FHE.asEuint64(0);
+        builderStakeAmountMUSD = 0;
         stakeRevealed = false;
 
         emit StakeReturned(agreement.builder, stakeToReturn);
