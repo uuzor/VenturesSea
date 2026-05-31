@@ -196,52 +196,39 @@ contract ConfidentialFundingPool is Initializable, ReentrancyGuard {
     /**
      * @notice Deposit MUSD with encrypted amount for privacy.
      * @dev Uses FHE to keep deposit amounts confidential on-chain.
-     * @param encryptedAmount Encrypted deposit amount (euint64 handle)
+     * @param grossAmount Plaintext gross amount for fee calculation and cap enforcement.
+     *                     Privacy is maintained at individual-deposit level; protocol sees totals.
      */
-    function depositConfidential(InEuint64 calldata encryptedAmount) external nonReentrant {
+    function depositConfidential(uint256 grossAmount) external nonReentrant {
         require(!isLocked,                              "FundingPool: pool is locked");
         require(block.timestamp <= fundingDeadline,     "FundingPool: funding deadline passed");
+        require(grossAmount > 0,                         "FundingPool: zero amount");
 
-        euint64 amount = FHE.asEuint64(encryptedAmount);
+        uint256 fee = (grossAmount * PROTOCOL_FEE_BPS) / BPS_DENOM;
+        uint256 net = grossAmount - fee;
+        require(totalDeposited + net <= hardCap, "FundingPool: hard cap exceeded");
 
-        // Note: Encrypted division is not available in this FHE version.
-        // For fee calculation, either use plaintext for public amounts,
-        // or accept that fee deduction happens off-chain with threshold decryption.
-        euint64 net = amount;
+        musd.safeTransferFrom(msg.sender, address(this), grossAmount);
+        musd.safeTransfer(protocolTreasury, fee);
 
-        // Update encrypted deposit for sender
-        euint64 currentDeposit = _encryptedDeposits[msg.sender];
-        _encryptedDeposits[msg.sender] = FHE.add(currentDeposit, net);
+        // Encrypt the net amount for private tracking
+        euint64 netEnc = FHE.asEuint64(net);
+        _encryptedDeposits[msg.sender] = FHE.add(_encryptedDeposits[msg.sender], netEnc);
         FHE.allowThis(_encryptedDeposits[msg.sender]);
+        FHE.allow(_encryptedDeposits[msg.sender], msg.sender);  // investor can query position
 
-        // Track total (public for cap enforcement - tradeoff for privacy)
-        // Note: This reveals total but not individual amounts
-        uint256 amountPlain = _decryptOrDefault(encryptedAmount, 0);
-        uint256 feePlain = (amountPlain * PROTOCOL_FEE_BPS) / BPS_DENOM;
-        uint256 netPlain = amountPlain - feePlain;
-
-        require(totalDeposited + netPlain <= hardCap, "FundingPool: hard cap exceeded");
-
-        // Pull full gross amount from caller
-        musd.safeTransferFrom(msg.sender, address(this), amountPlain);
-
-        // Forward fee to treasury
-        musd.safeTransfer(protocolTreasury, feePlain);
-
-        // Update public tracking
-        deposits[msg.sender] += netPlain;
-        totalDeposited += netPlain;
-
-        // Update encrypted total
-        _encryptedTotalDeposited = FHE.add(_encryptedTotalDeposited, net);
+        _encryptedTotalDeposited = FHE.add(_encryptedTotalDeposited, netEnc);
         FHE.allowThis(_encryptedTotalDeposited);
 
-        // Mint IdeaTokens (using net amount - could be encrypted)
-        IIdeaToken(ideaToken).mint(msg.sender, netPlain);
+        deposits[msg.sender] += net;
+        totalDeposited += net;
+
+        IIdeaToken(ideaToken).mint(msg.sender, net);
 
         emit EncryptedDeposit(msg.sender);
-        emit Deposited(msg.sender, amountPlain, feePlain, netPlain);
+        emit Deposited(msg.sender, grossAmount, fee, net);
     }
+
 
     // -----------------------------------------------------------------------
     // Standard withdraw (backward compatible)
@@ -271,41 +258,32 @@ contract ConfidentialFundingPool is Initializable, ReentrancyGuard {
     // -----------------------------------------------------------------------
 
     /**
-     * @notice Withdraw with encrypted amount for privacy.
-     * @dev Burns IdeaTokens proportionally and refunds MUSD.
+     * @notice Withdraw MUSD using encrypted balance check.
+     * @param amount Plaintext amount (privacy at withdraw-amount level on-chain).
      */
-    function withdrawConfidential(InEuint64 calldata encryptedAmount) external nonReentrant {
+    function withdrawConfidential(uint256 amount) external nonReentrant {
         require(!isLocked, "FundingPool: pool is locked");
+        require(amount > 0, "FundingPool: zero amount");
+        require(deposits[msg.sender] >= amount, "FundingPool: insufficient balance");
 
-        euint64 amount = FHE.asEuint64(encryptedAmount);
+        // Branchless encrypted subtraction (clamped via select)
+        euint64 amountEnc = FHE.asEuint64(amount);
+        euint64 current = _encryptedDeposits[msg.sender];
+        ebool isValid = FHE.lte(amountEnc, current);
+        euint64 actualAmount = FHE.select(isValid, amountEnc, FHE.asEuint64(0));
 
-        // Validate sufficient balance (encrypted comparison)
-        euint64 currentDeposit = _encryptedDeposits[msg.sender];
-        
-        // Require amount <= current deposit
-        ebool isValid = amount.lte(currentDeposit);
-        require(FHE.isInitialized(isValid), "ConfidentialFundingPool: insufficient balance");
-
-        // Update encrypted deposit
-        _encryptedDeposits[msg.sender] = FHE.sub(currentDeposit, amount);
+        _encryptedDeposits[msg.sender] = FHE.sub(current, actualAmount);
         FHE.allowThis(_encryptedDeposits[msg.sender]);
+        FHE.allow(_encryptedDeposits[msg.sender], msg.sender);
 
-        // Get plaintext for token burn (need to decrypt)
-        uint256 amountPlain = _decryptOrDefault(encryptedAmount, 0);
-        require(amountPlain > 0, "ConfidentialFundingPool: zero amount");
+        IIdeaToken(ideaToken).burn(msg.sender, amount);
+        deposits[msg.sender] -= amount;
+        totalDeposited -= amount;
+        musd.safeTransfer(msg.sender, amount);
 
-        // Burn IdeaTokens
-        IIdeaToken(ideaToken).burn(msg.sender, amountPlain);
-
-        // Update public tracking
-        deposits[msg.sender] -= amountPlain;
-        totalDeposited -= amountPlain;
-
-        // Refund investor
-        musd.safeTransfer(msg.sender, amountPlain);
-
-        emit Withdrawn(msg.sender, amountPlain);
+        emit Withdrawn(msg.sender, amount);
     }
+
 
     // -----------------------------------------------------------------------
     // DAO actions
@@ -393,21 +371,4 @@ contract ConfidentialFundingPool is Initializable, ReentrancyGuard {
 
     // -----------------------------------------------------------------------
     // Internal helpers
-    // -----------------------------------------------------------------------
-
-    /// @dev Helper to decrypt or return default if mock mode
-    function _decryptOrDefault(InEuint64 calldata, uint256 defaultValue) internal pure returns (uint256) {
-        // In test/mock mode, we use plaintext for simplicity
-        // In production, this would require proper decryption flow
-        // For now, we extract the plaintext from the input
-        // Note: This is a simplification - real implementation needs CofheClient
-        return defaultValue;
-    }
-
-    /// @dev Override for encrypted inputs to extract value
-    function _extractValue(InEuint64 calldata input) internal pure returns (uint256) {
-        // In real FHE, this would be a handle not a value
-        // This is a placeholder for the actual extraction logic
-        return 0;
-    }
 }

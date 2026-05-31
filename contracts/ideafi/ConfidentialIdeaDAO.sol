@@ -3,7 +3,7 @@ pragma solidity ^0.8.25;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
-import {FHE, euint8, euint16, euint32, euint64, euint128, InEuint64, ebool, eaddress, ITaskManager, Common} from "@fhenixprotocol/cofhe-contracts/FHE.sol";
+import {FHE, euint8, euint16, euint32, euint64, euint128, InEuint64, ebool, eaddress, ITaskManager, Common, Utils, FunctionId} from "@fhenixprotocol/cofhe-contracts/FHE.sol";
 import "./IIdeaFi.sol";
 
 /**
@@ -446,6 +446,7 @@ contract ConfidentialIdeaDAO is Initializable {
     function requestVoteDecryption(uint256 proposalId) external {
         require(proposalId < proposalCount, "IdeaDAO: invalid proposalId");
         require(!proposals[proposalId].cancelled, "IdeaDAO: proposal cancelled");
+        require(!decryptionRequested[proposalId], "IdeaDAO: decryption already requested");
 
         euint64 forVotes = _encryptedForVotes[proposalId];
         euint64 againstVotes = _encryptedAgainstVotes[proposalId];
@@ -454,7 +455,24 @@ contract ConfidentialIdeaDAO is Initializable {
         FHE.allowThis(forVotes);
         FHE.allowThis(againstVotes);
 
-        // Request decryption (FHE protocol will process off-chain)
+        // Create decryption tasks via ITaskManager (CoFHE pattern)
+        uint256[] memory forInputs = new uint256[](1);
+        forInputs[0] = uint256(euint64.unwrap(forVotes));
+        ITaskManager(0xeA30c4B8b44078Bbf8a6ef5b9f1eC1626C7848D9).createTask(
+            Utils.EUINT64_TFHE,
+            FunctionId.decrypt,
+            forInputs,
+            new uint256[](0)
+        );
+
+        uint256[] memory againstInputs = new uint256[](1);
+        againstInputs[0] = uint256(euint64.unwrap(againstVotes));
+        ITaskManager(0xeA30c4B8b44078Bbf8a6ef5b9f1eC1626C7848D9).createTask(
+            Utils.EUINT64_TFHE,
+            FunctionId.decrypt,
+            againstInputs,
+            new uint256[](0)
+        );
 
         decryptionRequested[proposalId] = true;
         emit VoteDecryptionRequested(proposalId);
@@ -473,18 +491,18 @@ contract ConfidentialIdeaDAO is Initializable {
         euint64 encAgainst = _encryptedAgainstVotes[proposalId];
 
         // Get decrypted results (requires off-chain FHE processing)
-        (uint256 forRevealed, bool forReady) = FHE.getDecryptResultSafe(euint64.unwrap(encFor));
-        (uint256 againstRevealed, bool againstReady) = FHE.getDecryptResultSafe(euint64.unwrap(encAgainst));
+        (uint64 forRevealed, bool forReady) = FHE.getDecryptResultSafe(encFor);
+        (uint64 againstRevealed, bool againstReady) = FHE.getDecryptResultSafe(encAgainst);
 
         require(forReady && againstReady, "IdeaDAO: decryption not complete");
 
         Proposal storage p = proposals[proposalId];
-        p.forVotes += uint64(forRevealed);
-        p.againstVotes += uint64(againstRevealed);
+        p.forVotes += forRevealed;
+        p.againstVotes += againstRevealed;
 
         decryptionRequested[proposalId] = false;
 
-        emit VotesRevealed(proposalId, uint64(forRevealed), uint64(againstRevealed));
+        emit VotesRevealed(proposalId, forRevealed, againstRevealed);
 
         // Auto-queue after reveal
         _queueInternal(proposalId);
