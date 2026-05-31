@@ -3,7 +3,7 @@ pragma solidity ^0.8.25;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
-import {FHE, euint64, inEuint64, ebool} from "@fhenixprotocol/contracts/FHE.sol";
+import {FHE, euint8, euint16, euint32, euint64, euint128, InEuint64, ebool, eaddress} from "@fhenixprotocol/cofhe-contracts/FHE.sol";
 import "./IIdeaFi.sol";
 
 /**
@@ -13,6 +13,7 @@ import "./IIdeaFi.sol";
  *         on-chain proposal execution and quorum verification.
  */
 contract ConfidentialIdeaDAO is Initializable {
+    using FHE for *;
     // -----------------------------------------------------------------------
     // Constants
     // -----------------------------------------------------------------------
@@ -217,7 +218,7 @@ contract ConfidentialIdeaDAO is Initializable {
      * @notice Cast vote with encrypted support for privacy.
      * @param encryptedSupport Encrypted boolean: 1 = for, 0 = against
      */
-    function castConfidentialVote(uint256 proposalId, inEuint64 calldata encryptedSupport) external {
+    function castConfidentialVote(uint256 proposalId, InEuint64 calldata encryptedSupport) external {
         require(proposalId < proposalCount, "IdeaDAO: invalid proposalId");
         Proposal storage p = proposals[proposalId];
         require(!p.cancelled, "IdeaDAO: proposal cancelled");
@@ -233,8 +234,8 @@ contract ConfidentialIdeaDAO is Initializable {
 
         // Branchless voting: if support=1, add to for; if support=0, add to against
         // forAdd = support * weight, againstAdd = (1 - support) * weight
-        euint64 forAdd = support * weightEncrypted;
-        euint64 againstAdd = (FHE.asEuint64(1) - support) * weightEncrypted;
+        euint64 forAdd = FHE.mul(support, weightEncrypted);
+        euint64 againstAdd = FHE.mul(FHE.sub(FHE.asEuint64(1), support), weightEncrypted);
 
         // Update encrypted vote counts
         _encryptedForVotes[proposalId] = FHE.add(_encryptedForVotes[proposalId], forAdd);
@@ -251,7 +252,7 @@ contract ConfidentialIdeaDAO is Initializable {
     /**
      * @notice Cast vote with standard support but encrypted weight.
      */
-    function castVoteWithEncryptedWeight(uint256 proposalId, bool support, inEuint64 calldata encryptedWeight) external {
+    function castVoteWithEncryptedWeight(uint256 proposalId, bool support, InEuint64 calldata encryptedWeight) external {
         require(proposalId < proposalCount, "IdeaDAO: invalid proposalId");
         Proposal storage p = proposals[proposalId];
         require(!p.cancelled, "IdeaDAO: proposal cancelled");

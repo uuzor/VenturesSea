@@ -42,12 +42,11 @@ module.exports = {
         version: "0.8.25",
         settings: { evmVersion: "cancun" },
       },
-      "@openzeppelin/contracts/utils/Arrays.sol": {
-        version: "0.8.25",
-        settings: { evmVersion: "cancun" },
-      },
     },
   },
+  remappings: [
+    "@fhenixprotocol/contracts=@fhenixprotocol/cofhe-contracts"
+  ],
   networks: {
     hardhat: {
       cofeEnabled: true,

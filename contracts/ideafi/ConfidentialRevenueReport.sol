@@ -2,7 +2,7 @@
 pragma solidity ^0.8.25;
 
 import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
-import {FHE, euint64, inEuint64, ebool} from "@fhenixprotocol/contracts/FHE.sol";
+import {FHE, euint8, euint16, euint32, euint64, euint128, InEuint64, ebool, eaddress} from "@fhenixprotocol/cofhe-contracts/FHE.sol";
 import "./IIdeaFi.sol";
 
 /**
@@ -170,7 +170,7 @@ contract ConfidentialRevenueReport is Initializable {
      */
     function submitConfidentialReport(
         bytes32 reportHash,
-        inEuint64 calldata encryptedRevenue,
+        InEuint64 calldata encryptedRevenue,
         uint256 periodStart,
         uint256 periodEnd
     ) external onlyBuilder {
@@ -240,7 +240,7 @@ contract ConfidentialRevenueReport is Initializable {
      */
     function acknowledgeWithVerification(
         uint256 reportId,
-        inEuint64 calldata encryptedExpectedAmount
+        InEuint64 calldata encryptedExpectedAmount
     ) external {
         require(msg.sender == fundingPool || _isLP(msg.sender), "RevenueReport: not LP");
         require(reportId < reportCount,                       "RevenueReport: invalid reportId");

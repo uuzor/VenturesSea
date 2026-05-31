@@ -5,7 +5,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import "../utils/ReentrancyGuard.sol";
-import {FHE, euint64, inEuint64, ebool} from "@fhenixprotocol/contracts/FHE.sol";
+import {FHE, euint8, euint16, euint32, euint64, euint128, InEuint64, ebool, eaddress} from "@fhenixprotocol/cofhe-contracts/FHE.sol";
 import "./IIdeaFi.sol";
 
 /**
@@ -198,7 +198,7 @@ contract ConfidentialFundingPool is Initializable, ReentrancyGuard {
      * @dev Uses FHE to keep deposit amounts confidential on-chain.
      * @param encryptedAmount Encrypted deposit amount (euint64 handle)
      */
-    function depositConfidential(inEuint64 calldata encryptedAmount) external nonReentrant {
+    function depositConfidential(InEuint64 calldata encryptedAmount) external nonReentrant {
         require(!isLocked,                              "FundingPool: pool is locked");
         require(block.timestamp <= fundingDeadline,     "FundingPool: funding deadline passed");
 
@@ -272,7 +272,7 @@ contract ConfidentialFundingPool is Initializable, ReentrancyGuard {
      * @notice Withdraw with encrypted amount for privacy.
      * @dev Burns IdeaTokens proportionally and refunds MUSD.
      */
-    function withdrawConfidential(inEuint64 calldata encryptedAmount) external nonReentrant {
+    function withdrawConfidential(InEuint64 calldata encryptedAmount) external nonReentrant {
         require(!isLocked, "FundingPool: pool is locked");
 
         euint64 amount = FHE.asEuint64(encryptedAmount);
@@ -393,7 +393,7 @@ contract ConfidentialFundingPool is Initializable, ReentrancyGuard {
     // -----------------------------------------------------------------------
 
     /// @dev Helper to decrypt or return default if mock mode
-    function _decryptOrDefault(inEuint64 calldata, uint256 defaultValue) internal pure returns (uint256) {
+    function _decryptOrDefault(InEuint64 calldata, uint256 defaultValue) internal pure returns (uint256) {
         // In test/mock mode, we use plaintext for simplicity
         // In production, this would require proper decryption flow
         // For now, we extract the plaintext from the input
@@ -402,7 +402,7 @@ contract ConfidentialFundingPool is Initializable, ReentrancyGuard {
     }
 
     /// @dev Override for encrypted inputs to extract value
-    function _extractValue(inEuint64 calldata input) internal pure returns (uint256) {
+    function _extractValue(InEuint64 calldata input) internal pure returns (uint256) {
         // In real FHE, this would be a handle not a value
         // This is a placeholder for the actual extraction logic
         return 0;

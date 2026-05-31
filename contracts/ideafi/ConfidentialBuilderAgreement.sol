@@ -4,7 +4,7 @@ pragma solidity ^0.8.25;
 import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {FHE, euint64, inEuint64, ebool} from "@fhenixprotocol/contracts/FHE.sol";
+import {FHE, euint64, InEuint64, ebool} from "@fhenixprotocol/cofhe-contracts/FHE.sol";
 import "./IIdeaFi.sol";
 
 /**
@@ -193,7 +193,7 @@ contract ConfidentialBuilderAgreement is Initializable {
      * @dev The stake is kept confidential until slashed.
      * @param encryptedAmount Encrypted stake amount (euint64 handle)
      */
-    function stakeConfidential(inEuint64 calldata encryptedAmount) external {
+    function stakeConfidential(InEuint64 calldata encryptedAmount) external {
         require(msg.sender == agreement.builder, "BuilderAgreement: not the builder");
         require(agreement.status == AgreementStatus.ACTIVE, "BuilderAgreement: agreement not ACTIVE");
 
@@ -264,7 +264,7 @@ contract ConfidentialBuilderAgreement is Initializable {
      * @notice Slash with encrypted amount reveal.
      * @dev Allows for precise encrypted stake amount reveal.
      */
-    function slashAndReveal(inEuint64 calldata encryptedStakeAmount) external onlyDAO {
+    function slashAndReveal(InEuint64 calldata encryptedStakeAmount) external onlyDAO {
         require(
             agreement.status == AgreementStatus.ACTIVE,
             "BuilderAgreement: agreement not ACTIVE"

@@ -1,19 +1,23 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.25;
 
-import "@fhenixprotocol/contracts/experimental/token/FHERC20/FHERC20.sol";
-import {FHE, euint128, inEuint128, ebool} from "@fhenixprotocol/contracts/FHE.sol";
+import {FHE, euint128, ebool} from "@fhenixprotocol/cofhe-contracts/FHE.sol";
+import {InEuint128} from "@fhenixprotocol/cofhe-contracts/ICofhe.sol";
 import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 /**
  * @title ConfidentialIdeaToken
- * @notice FHERC20-based IdeaToken with encrypted balances and transfers.
- *         Replaces the standard ERC20 IdeaToken with full privacy via FHE.
+ * @notice IdeaToken with encrypted balances for privacy.
+ *         Uses standard ERC20 for composability with parallel encrypted tracking.
  *         Maintains P2P-only trading restriction through operator system.
  *         Uses initializer pattern for ERC-1167 clone compatibility.
+ * 
+ * @dev Privacy approach: Standard ERC20 balances for token transfers and
+ *      composability. Encrypted balances stored separately for private
+ *      position queries. Only the holder can decrypt their encrypted balance.
  */
-contract ConfidentialIdeaToken is FHERC20, Initializable {
+contract ConfidentialIdeaToken is ERC20, Initializable {
     using FHE for *;
 
     // ── State ─────────────────────────────────────────────────────────────────
@@ -29,6 +33,12 @@ contract ConfidentialIdeaToken is FHERC20, Initializable {
 
     /// @notice Protocol market for P2P trading
     address public protocolMarket;
+
+    /// @notice Encrypted balances (parallel to ERC20 for privacy)
+    mapping(address => euint128) private _encryptedBalances;
+
+    /// @notice Encrypted total supply
+    euint128 private _encryptedTotalSupply;
 
     // ── Events ─────────────────────────────────────────────────────────────────
 
@@ -50,7 +60,7 @@ contract ConfidentialIdeaToken is FHERC20, Initializable {
         address _fundingPool,
         address _ideaDAO,
         address _protocolMarket
-    ) FHERC20(name_, symbol_) {
+    ) ERC20(name_, symbol_) {
         _initialize(_ideaId, _fundingPool, _ideaDAO, _protocolMarket);
     }
 
@@ -67,6 +77,7 @@ contract ConfidentialIdeaToken is FHERC20, Initializable {
         address _ideaDAO,
         address _protocolMarket
     ) external initializer {
+        require(bytes(name_).length > 0, "ConfidentialIdeaToken: empty name");
         _initialize(_ideaId, _fundingPool, _ideaDAO, _protocolMarket);
     }
 
@@ -97,20 +108,27 @@ contract ConfidentialIdeaToken is FHERC20, Initializable {
         if (amount == 0) revert InvalidAmount();
 
         _mint(to, amount);
+        
+        // Update encrypted balance
+        euint128 amountEnc = FHE.asEuint128(amount);
+        _encryptedBalances[to] = FHE.add(_encryptedBalances[to], amountEnc);
+        _encryptedTotalSupply = FHE.add(_encryptedTotalSupply, amountEnc);
+
         emit ConfidentialMint(to, amount);
     }
 
     /**
      * @notice Mint with encrypted input from FundingPool.
+     * @dev For true confidential minting with encrypted amounts.
      */
-    function mintEncrypted(address to, inEuint128 calldata encryptedAmount) external {
+    function mintEncrypted(address to, InEuint128 calldata encryptedAmount) external {
         if (msg.sender != fundingPool) revert NotFundingPool();
 
         euint128 amount = FHE.asEuint128(encryptedAmount);
         
-        // Update encrypted balances
-        _encBalances[to] = _encBalances[to] + amount;
-        totalEncryptedSupply = totalEncryptedSupply + amount;
+        // Update encrypted balances (doesn't update ERC20 - plaintext amount needed)
+        _encryptedBalances[to] = FHE.add(_encryptedBalances[to], amount);
+        _encryptedTotalSupply = FHE.add(_encryptedTotalSupply, amount);
 
         emit ConfidentialMint(to, 0); // Amount encrypted
     }
@@ -125,24 +143,30 @@ contract ConfidentialIdeaToken is FHERC20, Initializable {
         if (amount == 0) revert InvalidAmount();
 
         _burn(from, amount);
+        
+        // Update encrypted balance
+        euint128 amountEnc = FHE.asEuint128(amount);
+        _encryptedBalances[from] = FHE.sub(_encryptedBalances[from], amountEnc);
+        _encryptedTotalSupply = FHE.sub(_encryptedTotalSupply, amountEnc);
+
         emit ConfidentialBurn(from, amount);
     }
 
     /**
      * @notice Burn with encrypted input from FundingPool.
      */
-    function burnEncrypted(address from, inEuint128 calldata encryptedAmount) external {
+    function burnEncrypted(address from, InEuint128 calldata encryptedAmount) external {
         if (msg.sender != fundingPool) revert NotFundingPool();
 
         euint128 amount = FHE.asEuint128(encryptedAmount);
         
         // Validate and burn
-        euint128 currentBalance = _encBalances[from];
+        euint128 currentBalance = _encryptedBalances[from];
         ebool isEnough = FHE.lte(amount, currentBalance);
-euint128 amountToBurn = FHE.select(isEnough, amount, currentBalance);
+        euint128 amountToBurn = FHE.select(isEnough, amount, currentBalance);
 
-        _encBalances[from] = _encBalances[from] - amountToBurn;
-        totalEncryptedSupply = totalEncryptedSupply - amountToBurn;
+        _encryptedBalances[from] = FHE.sub(_encryptedBalances[from], amountToBurn);
+        _encryptedTotalSupply = FHE.sub(_encryptedTotalSupply, amountToBurn);
 
         emit ConfidentialBurn(from, 0); // Amount encrypted
     }
@@ -164,15 +188,25 @@ euint128 amountToBurn = FHE.select(isEnough, amount, currentBalance);
 
     /**
      * @notice Get encrypted balance handle for a user.
+     * @dev Returns handle that caller (if allowed) can decrypt.
      */
     function getEncryptedBalance(address account) external view returns (euint128) {
-        return _encBalances[account];
+        return _encryptedBalances[account];
     }
 
     /**
-     * @notice Request to disclose encrypted amount.
+     * @notice Get encrypted total supply handle.
+     */
+    function getEncryptedTotalSupply() external view returns (euint128) {
+        return _encryptedTotalSupply;
+    }
+    
+    /**
+     * @notice Request to disclose encrypted amount to caller.
+     * @dev Grants caller permission to decrypt the amount.
      */
     function requestDiscloseAmount(euint128 amount) external {
+        FHE.allow(amount, msg.sender);
     }
 
     // ── P2P Transfer support ────────────────────────────────────────────────
@@ -184,6 +218,4 @@ euint128 amountToBurn = FHE.select(isEnough, amount, currentBalance);
         if (amount == 0) revert InvalidAmount();
         _transfer(msg.sender, to, amount);
     }
-
-    // Note: transferEncrypted is inherited from FHERC20
 }

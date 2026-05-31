@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.25;
 
-import "@fhenixprotocol/contracts/FHE.sol";
+import {FHE} from "@fhenixprotocol/cofhe-contracts/FHE.sol";
 import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 
 /**
