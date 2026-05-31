@@ -201,6 +201,7 @@ contract ConfidentialBuilderAgreement is Initializable {
 
         // Update encrypted stake
         _encryptedStake = FHE.add(_encryptedStake, amount);
+        FHE.allowThis(_encryptedStake);
 
         // Allow contract to manage the stake
 
@@ -221,6 +222,7 @@ contract ConfidentialBuilderAgreement is Initializable {
 
         // Update encrypted stake
         euint64 amountEnc = FHE.asEuint64(amount);
+        FHE.allowThis(_encryptedStake);
         _encryptedStake = FHE.add(_encryptedStake, amountEnc);
 
         // Track actual stake amount in MUSD (not basis points)

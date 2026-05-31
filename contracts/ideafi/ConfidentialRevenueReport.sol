@@ -221,6 +221,7 @@ contract ConfidentialRevenueReport is Initializable {
 
         // Update encrypted acknowledgement count
         _encryptedAckCount[reportId] = FHE.add(_encryptedAckCount[reportId], FHE.asEuint64(1));
+        FHE.allowThis(_encryptedAckCount[reportId]);
 
         uint256 count = reports[reportId].acknowledgementCount;
         emit Acknowledged(reportId, msg.sender, count);
@@ -255,6 +256,7 @@ contract ConfidentialRevenueReport is Initializable {
         hasAcknowledged[reportId][msg.sender] = true;
         reports[reportId].acknowledgementCount++;
         _encryptedAckCount[reportId] = FHE.add(_encryptedAckCount[reportId], FHE.asEuint64(1));
+        FHE.allowThis(_encryptedAckCount[reportId]);
 
         uint256 count = reports[reportId].acknowledgementCount;
         emit Acknowledged(reportId, msg.sender, count);
