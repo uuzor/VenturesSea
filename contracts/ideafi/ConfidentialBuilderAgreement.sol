@@ -89,6 +89,7 @@ contract ConfidentialBuilderAgreement is Initializable {
     event StakeReturned(address indexed builder, uint256 amount);
     event RevenueTermsSet(bytes32 indexed agreementHash);
     event Completed(address indexed builder);
+    event SlashDistributed(address indexed builder, uint256 builderStakeBps);
 
     // -----------------------------------------------------------------------
     // Modifier
@@ -201,6 +202,7 @@ contract ConfidentialBuilderAgreement is Initializable {
 
         // Update encrypted stake
         _encryptedStake = FHE.add(_encryptedStake, amount);
+        FHE.allowThis(_encryptedStake);
 
         // Allow contract to manage the stake
 
@@ -221,6 +223,7 @@ contract ConfidentialBuilderAgreement is Initializable {
 
         // Update encrypted stake
         euint64 amountEnc = FHE.asEuint64(amount);
+        FHE.allowThis(_encryptedStake);
         _encryptedStake = FHE.add(_encryptedStake, amountEnc);
 
         // Track actual stake amount in MUSD (not basis points)
@@ -258,25 +261,6 @@ contract ConfidentialBuilderAgreement is Initializable {
         }
 
         emit StakeSlashed(builder, slashedAmountPublic);
-    }
-
-    /**
-     * @notice Slash with encrypted amount reveal.
-     * @dev Allows for precise encrypted stake amount reveal.
-     */
-    function slashAndReveal(InEuint64 calldata encryptedStakeAmount) external onlyDAO {
-        require(
-            agreement.status == AgreementStatus.ACTIVE,
-            "BuilderAgreement: agreement not ACTIVE"
-        );
-
-        agreement.status = AgreementStatus.SLASHED;
-        stakeRevealed = true;
-
-        // Mark for public decryption
-        euint64 stakeHandle = FHE.asEuint64(encryptedStakeAmount);
-
-        emit StakeSlashed(agreement.builder, 0); // Amount will be revealed via decryption
     }
 
     /**
@@ -385,5 +369,3 @@ contract ConfidentialBuilderAgreement is Initializable {
     }
 }
 
-// Event emission for slash distribution
-event SlashDistributed(address indexed builder, uint256 builderStakeBps);

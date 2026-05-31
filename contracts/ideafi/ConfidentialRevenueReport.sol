@@ -2,7 +2,7 @@
 pragma solidity ^0.8.25;
 
 import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
-import {FHE, euint8, euint16, euint32, euint64, euint128, InEuint64, ebool, eaddress} from "@fhenixprotocol/cofhe-contracts/FHE.sol";
+import {FHE, euint8, euint16, euint32, euint64, euint128, InEuint64, ebool, eaddress, ITaskManager, Common} from "@fhenixprotocol/cofhe-contracts/FHE.sol";
 import "./IIdeaFi.sol";
 
 /**
@@ -72,6 +72,7 @@ contract ConfidentialRevenueReport is Initializable {
         uint256 periodEnd,
         bytes32 reportHash
     );
+    event RevenueDisclosureRequested(uint256 indexed reportId, uint256 encryptedValue);
     event ConfidentialRevenueSubmitted(uint256 indexed reportId);
     event Acknowledged(uint256 indexed reportId, address indexed lp, uint256 newCount);
     event MajorityAcknowledged(uint256 indexed reportId);
@@ -221,6 +222,7 @@ contract ConfidentialRevenueReport is Initializable {
 
         // Update encrypted acknowledgement count
         _encryptedAckCount[reportId] = FHE.add(_encryptedAckCount[reportId], FHE.asEuint64(1));
+        FHE.allowThis(_encryptedAckCount[reportId]);
 
         uint256 count = reports[reportId].acknowledgementCount;
         emit Acknowledged(reportId, msg.sender, count);
@@ -255,6 +257,7 @@ contract ConfidentialRevenueReport is Initializable {
         hasAcknowledged[reportId][msg.sender] = true;
         reports[reportId].acknowledgementCount++;
         _encryptedAckCount[reportId] = FHE.add(_encryptedAckCount[reportId], FHE.asEuint64(1));
+        FHE.allowThis(_encryptedAckCount[reportId]);
 
         uint256 count = reports[reportId].acknowledgementCount;
         emit Acknowledged(reportId, msg.sender, count);
@@ -323,33 +326,36 @@ contract ConfidentialRevenueReport is Initializable {
         return block.timestamp <= reports[reportId].disputeDeadline;
     }
 
-// ── Internal helpers ─────────────────────────────────────────────────────
+    // ── Internal helpers ─────────────────────────────────────────────────────
 
-/// @dev Check if address is a known LP
-function _isLP(address account) internal view returns (bool) {
-    return isKnownLP[account];
-}
+    /// @dev Check if address is a known LP
+    function _isLP(address account) internal view returns (bool) {
+        return isKnownLP[account];
+    }
 
-/**
- * @notice Get encrypted revenue handle for a report.
- * @dev Returns ciphertext that can be decrypted for authorized reveals.
- */
-function getEncryptedRevenue(uint256 reportId) external view returns (euint64) {
-    return _encryptedRevenue[reportId];
-}
+    /**
+     * @notice Get encrypted revenue handle for a report.
+     * @dev Returns ciphertext that can be decrypted for authorized reveals.
+     */
+    function getEncryptedRevenue(uint256 reportId) external view returns (euint64) {
+        return _encryptedRevenue[reportId];
+    }
 
-/**
- * @notice Get encrypted acknowledgement count.
- */
-function getEncryptedAckCount(uint256 reportId) external view returns (euint64) {
-    return _encryptedAckCount[reportId];
-}
+    /**
+     * @notice Get encrypted acknowledgement count.
+     */
+    function getEncryptedAckCount(uint256 reportId) external view returns (euint64) {
+        return _encryptedAckCount[reportId];
+    }
 
-/**
- * @notice Request public disclosure of encrypted revenue.
- */
-function requestRevenueDisclosure(uint256 reportId) external {
-    require(reportId < reportCount, "RevenueReport: invalid reportId");
-    euint64 revenue = _encryptedRevenue[reportId];
-}
+    /**
+     * @notice Request public disclosure of encrypted revenue.
+     */
+    function requestRevenueDisclosure(uint256 reportId) external {
+        require(reportId < reportCount, "RevenueReport: invalid reportId");
+        euint64 revenue = _encryptedRevenue[reportId];
+        FHE.allowThis(revenue);
+        // Mark for decryption - off-chain resolver will handle via CoFHE
+        emit RevenueDisclosureRequested(reportId, uint256(euint64.unwrap(revenue)));
+    }
 }

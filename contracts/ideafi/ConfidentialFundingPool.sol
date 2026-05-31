@@ -212,6 +212,7 @@ contract ConfidentialFundingPool is Initializable, ReentrancyGuard {
         // Update encrypted deposit for sender
         euint64 currentDeposit = _encryptedDeposits[msg.sender];
         _encryptedDeposits[msg.sender] = FHE.add(currentDeposit, net);
+        FHE.allowThis(_encryptedDeposits[msg.sender]);
 
         // Track total (public for cap enforcement - tradeoff for privacy)
         // Note: This reveals total but not individual amounts
@@ -233,6 +234,7 @@ contract ConfidentialFundingPool is Initializable, ReentrancyGuard {
 
         // Update encrypted total
         _encryptedTotalDeposited = FHE.add(_encryptedTotalDeposited, net);
+        FHE.allowThis(_encryptedTotalDeposited);
 
         // Mint IdeaTokens (using net amount - could be encrypted)
         IIdeaToken(ideaToken).mint(msg.sender, netPlain);
@@ -286,6 +288,7 @@ contract ConfidentialFundingPool is Initializable, ReentrancyGuard {
 
         // Update encrypted deposit
         _encryptedDeposits[msg.sender] = FHE.sub(currentDeposit, amount);
+        FHE.allowThis(_encryptedDeposits[msg.sender]);
 
         // Get plaintext for token burn (need to decrypt)
         uint256 amountPlain = _decryptOrDefault(encryptedAmount, 0);

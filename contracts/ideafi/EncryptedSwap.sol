@@ -502,14 +502,6 @@ contract EncryptedSwap is Initializable {
     }
 
     /**
-     * @notice Helper to get decrypted amount for remaining calculation
-     * @dev Placeholder - actual implementation uses FHE decryption
-     */
-    function getDecryptedAmountA() public view returns (uint256) {
-        // This is a simplified placeholder
-        // In production, this would interact with FHE runtime
-        return type(uint256).max;
-    }
 
     // ── Offer Cancellation ────────────────────────────────────────────────────────
 

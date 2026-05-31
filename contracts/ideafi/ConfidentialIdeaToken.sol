@@ -24,6 +24,8 @@ contract ConfidentialIdeaToken is ERC20, Initializable {
 
     /// @notice Idea ID this token represents
     uint256 public ideaId;
+    string private _customName;
+    string private _customSymbol;
 
     /// @notice Funding pool that can mint/burn tokens
     address public fundingPool;
@@ -61,7 +63,7 @@ contract ConfidentialIdeaToken is ERC20, Initializable {
         address _ideaDAO,
         address _protocolMarket
     ) ERC20(name_, symbol_) {
-        _initialize(_ideaId, _fundingPool, _ideaDAO, _protocolMarket);
+        _initialize(_ideaId, name_, symbol_, _fundingPool, _ideaDAO, _protocolMarket);
     }
 
     // ── Initializer ──────────────────────────────────────────────────────────
@@ -78,11 +80,13 @@ contract ConfidentialIdeaToken is ERC20, Initializable {
         address _protocolMarket
     ) external initializer {
         require(bytes(name_).length > 0, "ConfidentialIdeaToken: empty name");
-        _initialize(_ideaId, _fundingPool, _ideaDAO, _protocolMarket);
+        _initialize(_ideaId, name_, symbol_, _fundingPool, _ideaDAO, _protocolMarket);
     }
 
     function _initialize(
         uint256 _ideaId,
+        string memory name_,
+        string memory symbol_,
         address _fundingPool,
         address _ideaDAO,
         address _protocolMarket
@@ -93,6 +97,8 @@ contract ConfidentialIdeaToken is ERC20, Initializable {
         require(_protocolMarket != address(0), "ConfidentialIdeaToken: zero market");
 
         ideaId = _ideaId;
+        _customName = name_;
+        _customSymbol = symbol_;
         fundingPool = _fundingPool;
         ideaDAO = _ideaDAO;
         protocolMarket = _protocolMarket;
@@ -112,7 +118,9 @@ contract ConfidentialIdeaToken is ERC20, Initializable {
         // Update encrypted balance
         euint128 amountEnc = FHE.asEuint128(amount);
         _encryptedBalances[to] = FHE.add(_encryptedBalances[to], amountEnc);
+        FHE.allowThis(_encryptedBalances[to]);
         _encryptedTotalSupply = FHE.add(_encryptedTotalSupply, amountEnc);
+        FHE.allowThis(_encryptedTotalSupply);
 
         emit ConfidentialMint(to, amount);
     }
@@ -128,7 +136,9 @@ contract ConfidentialIdeaToken is ERC20, Initializable {
         
         // Update encrypted balances (doesn't update ERC20 - plaintext amount needed)
         _encryptedBalances[to] = FHE.add(_encryptedBalances[to], amount);
+        FHE.allowThis(_encryptedBalances[to]);
         _encryptedTotalSupply = FHE.add(_encryptedTotalSupply, amount);
+        FHE.allowThis(_encryptedTotalSupply);
 
         emit ConfidentialMint(to, 0); // Amount encrypted
     }
@@ -147,7 +157,9 @@ contract ConfidentialIdeaToken is ERC20, Initializable {
         // Update encrypted balance
         euint128 amountEnc = FHE.asEuint128(amount);
         _encryptedBalances[from] = FHE.sub(_encryptedBalances[from], amountEnc);
+        FHE.allowThis(_encryptedBalances[from]);
         _encryptedTotalSupply = FHE.sub(_encryptedTotalSupply, amountEnc);
+        FHE.allowThis(_encryptedTotalSupply);
 
         emit ConfidentialBurn(from, amount);
     }
@@ -167,7 +179,9 @@ contract ConfidentialIdeaToken is ERC20, Initializable {
 
         _encryptedBalances[from] = FHE.sub(_encryptedBalances[from], amountToBurn);
         _encryptedTotalSupply = FHE.sub(_encryptedTotalSupply, amountToBurn);
+        FHE.allowThis(_encryptedBalances[from]);
 
+        FHE.allowThis(_encryptedTotalSupply);
         emit ConfidentialBurn(from, 0); // Amount encrypted
     }
 

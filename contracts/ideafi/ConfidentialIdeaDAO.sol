@@ -3,7 +3,7 @@ pragma solidity ^0.8.25;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
-import {FHE, euint8, euint16, euint32, euint64, euint128, InEuint64, ebool, eaddress} from "@fhenixprotocol/cofhe-contracts/FHE.sol";
+import {FHE, euint8, euint16, euint32, euint64, euint128, InEuint64, ebool, eaddress, ITaskManager, Common} from "@fhenixprotocol/cofhe-contracts/FHE.sol";
 import "./IIdeaFi.sol";
 
 /**
@@ -71,6 +71,7 @@ contract ConfidentialIdeaDAO is Initializable {
     mapping(uint256 => Proposal) public proposals;
     mapping(uint256 => mapping(address => bool)) public hasVoted;
     mapping(uint256 => uint256) public proposalEta;
+    mapping(uint256 => bool) public decryptionRequested;
 
     // ── Confidential voting state ──────────────────────────────────────────
 
@@ -239,10 +240,13 @@ contract ConfidentialIdeaDAO is Initializable {
 
         // Update encrypted vote counts
         _encryptedForVotes[proposalId] = FHE.add(_encryptedForVotes[proposalId], forAdd);
+        FHE.allowThis(_encryptedForVotes[proposalId]);
         _encryptedAgainstVotes[proposalId] = FHE.add(_encryptedAgainstVotes[proposalId], againstAdd);
+        FHE.allowThis(_encryptedAgainstVotes[proposalId]);
 
         // Increment voter count
         _encryptedVoterCount[proposalId] = FHE.add(_encryptedVoterCount[proposalId], FHE.asEuint64(1));
+        FHE.allowThis(_encryptedVoterCount[proposalId]);
 
         hasVoted[proposalId][msg.sender] = true;
 
@@ -267,8 +271,11 @@ contract ConfidentialIdeaDAO is Initializable {
         euint64 againstAdd = support ? FHE.asEuint64(0) : weightEncrypted;
 
         _encryptedForVotes[proposalId] = FHE.add(_encryptedForVotes[proposalId], forAdd);
+        FHE.allowThis(_encryptedForVotes[proposalId]);
         _encryptedAgainstVotes[proposalId] = FHE.add(_encryptedAgainstVotes[proposalId], againstAdd);
+        FHE.allowThis(_encryptedAgainstVotes[proposalId]);
         _encryptedVoterCount[proposalId] = FHE.add(_encryptedVoterCount[proposalId], FHE.asEuint64(1));
+        FHE.allowThis(_encryptedVoterCount[proposalId]);
 
         hasVoted[proposalId][msg.sender] = true;
 
@@ -428,4 +435,90 @@ contract ConfidentialIdeaDAO is Initializable {
         return p.forVotes > p.againstVotes && 
                (p.forVotes * 10000) / totalSupply >= QUORUM_BPS;
     }
+
+    // ── Vote Decryption & Reveal ─────────────────────────────────────────────
+
+    /**
+     * @notice Request decryption of encrypted votes for a proposal.
+     *         Must be called before revealAndQueue.
+     *         Uses 2-transaction pattern: request -> wait -> reveal.
+     */
+    function requestVoteDecryption(uint256 proposalId) external {
+        require(proposalId < proposalCount, "IdeaDAO: invalid proposalId");
+        require(!proposals[proposalId].cancelled, "IdeaDAO: proposal cancelled");
+
+        euint64 forVotes = _encryptedForVotes[proposalId];
+        euint64 againstVotes = _encryptedAgainstVotes[proposalId];
+
+        // Allow this contract to decrypt its own ciphertexts
+        FHE.allowThis(forVotes);
+        FHE.allowThis(againstVotes);
+
+        // Request decryption (FHE protocol will process off-chain)
+
+        decryptionRequested[proposalId] = true;
+        emit VoteDecryptionRequested(proposalId);
+    }
+
+    /**
+     * @notice Reveal decrypted votes and queue the proposal.
+     *         Must be called after requestVoteDecryption and sufficient delay.
+     */
+    function revealAndQueue(uint256 proposalId) external {
+        require(proposalId < proposalCount, "IdeaDAO: invalid proposalId");
+        require(decryptionRequested[proposalId], "IdeaDAO: decryption not requested");
+        require(!proposals[proposalId].executed, "IdeaDAO: already executed");
+
+        euint64 encFor = _encryptedForVotes[proposalId];
+        euint64 encAgainst = _encryptedAgainstVotes[proposalId];
+
+        // Get decrypted results (requires off-chain FHE processing)
+        (uint256 forRevealed, bool forReady) = FHE.getDecryptResultSafe(euint64.unwrap(encFor));
+        (uint256 againstRevealed, bool againstReady) = FHE.getDecryptResultSafe(euint64.unwrap(encAgainst));
+
+        require(forReady && againstReady, "IdeaDAO: decryption not complete");
+
+        Proposal storage p = proposals[proposalId];
+        p.forVotes += uint64(forRevealed);
+        p.againstVotes += uint64(againstRevealed);
+
+        decryptionRequested[proposalId] = false;
+
+        emit VotesRevealed(proposalId, uint64(forRevealed), uint64(againstRevealed));
+
+        // Auto-queue after reveal
+        _queueInternal(proposalId);
+    }
+
+    /**
+     * @notice Internal queue function after vote reveal.
+     */
+    function _queueInternal(uint256 proposalId) internal {
+        Proposal storage p = proposals[proposalId];
+        require(!p.cancelled, "IdeaDAO: proposal cancelled");
+        require(proposalEta[proposalId] == 0, "IdeaDAO: already queued");
+        require(block.timestamp > p.deadline, "IdeaDAO: voting not ended");
+
+        uint256 totalSupply = IERC20(ideaToken).totalSupply();
+        require(totalSupply > 0, "IdeaDAO: zero total supply");
+        require(p.forVotes > p.againstVotes, "IdeaDAO: proposal did not pass");
+        require(
+            (p.forVotes * 10000) / totalSupply >= QUORUM_BPS,
+            "IdeaDAO: quorum not reached"
+        );
+
+        if (p.pType == ProposalType.NULLIFY_IDEA) {
+            require(
+                (p.forVotes * 10000) / totalSupply >= NULLIFY_THRESHOLD_BPS,
+                "IdeaDAO: nullify requires 66% supermajority"
+            );
+        }
+
+        uint256 eta = block.timestamp + TIMELOCK;
+        proposalEta[proposalId] = eta;
+        emit Queued(proposalId, eta);
+    }
+
+    event VoteDecryptionRequested(uint256 indexed proposalId);
+    event VotesRevealed(uint256 indexed proposalId, uint64 forVotes, uint64 againstVotes);
 }

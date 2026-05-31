@@ -62,4 +62,24 @@ contract MockRegistry {
 
     // updateStatus called by IdeaDAO.nullifyIdea — no-op in mock
     function updateStatus(uint256, uint8) external {}
+
+    // linkContracts passthrough for IdeaFactory compatibility
+    function linkContracts(
+        uint256 ideaId,
+        address pool,
+        address token,
+        address builderAgreement,
+        address milestone,
+        address revenueReport,
+        address ideaDAO
+    ) external {
+        ideaAddrs[ideaId] = IdeaAddresses({
+            ideaDAO: ideaDAO,
+            fundingPool: pool,
+            builderAgreement: builderAgreement,
+            milestoneContract: milestone,
+            revenueReport: revenueReport,
+            ideaToken: token
+        });
+    }
 }
