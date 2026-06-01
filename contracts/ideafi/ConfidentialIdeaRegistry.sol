@@ -2,6 +2,7 @@
 pragma solidity ^0.8.25;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "./IIdeaFi.sol";
 
 /**
  * @title ConfidentialIdeaRegistry
@@ -130,24 +131,14 @@ contract ConfidentialIdeaRegistry is Ownable {
 
         emit IdeaCreated(ideaId, msg.sender, ideaType, confidentialMode);
 
-        // Deploy via appropriate factory
+        // Deploy via appropriate factory - use direct interface call to preserve msg.sender
         if (confidentialMode && confidentialFactory != address(0)) {
-            // Use interface to call deployIdeaContracts
-            (bool success, ) = confidentialFactory.call(
-                abi.encodeWithSignature(
-                    "deployIdeaContracts(uint256,address,address)",
-                    ideaId, msg.sender, address(0)
-                )
-            );
-            require(success, "IdeaRegistry: confidential deployment failed");
+            // Get the factory interface and call directly
+            IIdeaFactory cf = IIdeaFactory(confidentialFactory);
+            cf.deployIdeaContracts(ideaId, msg.sender, address(0));
         } else if (factory != address(0)) {
-            (bool success, ) = factory.call(
-                abi.encodeWithSignature(
-                    "deployIdeaContracts(uint256,address,address)",
-                    ideaId, msg.sender, address(0)
-                )
-            );
-            require(success, "IdeaRegistry: standard deployment failed");
+            IIdeaFactory f = IIdeaFactory(factory);
+            f.deployIdeaContracts(ideaId, msg.sender, address(0));
         }
     }
 

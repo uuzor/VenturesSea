@@ -63,7 +63,9 @@ contract ConfidentialIdeaToken is ERC20, Initializable {
         address _ideaDAO,
         address _protocolMarket
     ) ERC20(name_, symbol_) {
-        _initialize(_ideaId, name_, symbol_, _fundingPool, _ideaDAO, _protocolMarket);
+        if (_ideaDAO != address(0)) {
+            _initialize(_ideaId, name_, symbol_, _fundingPool, _ideaDAO, _protocolMarket);
+        }
     }
 
     // ── Initializer ──────────────────────────────────────────────────────────
