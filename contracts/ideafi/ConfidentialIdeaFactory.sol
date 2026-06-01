@@ -7,7 +7,7 @@ import "./ConfidentialFundingPool.sol";
 import "./ConfidentialBuilderAgreement.sol";
 import "./ConfidentialIdeaDAO.sol";
 import "./ConfidentialRevenueReport.sol";
-import "./Milestone.sol";  // Milestone doesn't need FHE privacy yet
+import "./ConfidentialMilestone.sol";
 import "./SimpleOwnable.sol";
 
 /**
@@ -161,8 +161,8 @@ contract ConfidentialIdeaFactory {
             ideaId, registry, fundingPool, protocolTreasury, musd
         );
 
-        // 6. Initialize Milestone (standard - doesn't need FHE yet)
-        Milestone(milestone).initialize(ideaId, registry, fundingPool);
+        // 6. Initialize Milestone (FHE-enabled confidential milestone)
+        ConfidentialMilestone(milestone).initialize(ideaId, registry, fundingPool, address(0));
 
         // 7. Initialize RevenueReport
         ConfidentialRevenueReport(revenueReport).initialize(ideaId, registry, fundingPool);
