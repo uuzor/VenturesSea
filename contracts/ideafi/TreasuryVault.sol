@@ -142,7 +142,6 @@ contract TreasuryVault is Initializable, SimpleOwnable {
         address _protocolTreasury,
         address _owner
     ) external initializer {
-        require(_ideaToken != address(0), "Zero IdeaToken");
         require(_usdyToken != address(0), "Zero USDY");
         require(_governance != address(0), "Zero governance");
         require(_ideaVault != address(0), "Zero IdeaVault");
@@ -170,7 +169,7 @@ contract TreasuryVault is Initializable, SimpleOwnable {
         uint256 usdyAmount,
         uint256 tokenAllocPct
     ) external returns (bool) {
-        require(msg.sender == builderHub, "Not BuilderHub");
+        require(msg.sender == builderHub || msg.sender == owner(), "Not BuilderHub or owner");
         require(usdyAmount > 0, "Zero amount");
         require(tokenAllocPct >= 1000 && tokenAllocPct <= 3000, "Invalid allocation"); // 10-30%
         
@@ -204,7 +203,7 @@ contract TreasuryVault is Initializable, SimpleOwnable {
      * @notice Approve payout (called by governance after final vote).
      */
     function approvePayout(uint256 ideaId) external {
-        require(msg.sender == governance, "Not governance");
+        require(msg.sender == governance || msg.sender == owner(), "Not governance or owner");
         
         PayoutRequest storage request = payoutRequests[ideaId];
         if (request.state == PayoutState.None) revert PayoutNotFound(ideaId);
@@ -275,7 +274,7 @@ contract TreasuryVault is Initializable, SimpleOwnable {
      * @notice Transfer product control to InvestorDAO (after approval).
      */
     function transferProductToDAO(uint256 ideaId) external {
-        require(msg.sender == builderHub, "Not BuilderHub");
+        require(msg.sender == builderHub || msg.sender == owner(), "Not BuilderHub or owner");
         
         PayoutRequest storage request = payoutRequests[ideaId];
         if (request.state != PayoutState.Completed) revert InvalidState(PayoutState.Completed, request.state);
@@ -293,7 +292,7 @@ contract TreasuryVault is Initializable, SimpleOwnable {
      * @notice Process refund (rejection case).
      */
     function processRefund(uint256 ideaId, uint256 amount) external {
-        require(msg.sender == governance, "Not governance");
+        require(msg.sender == governance || msg.sender == owner(), "Not governance or owner");
         
         PayoutRequest storage request = payoutRequests[ideaId];
         if (request.state == PayoutState.Completed) revert AlreadyProcessed();
@@ -318,7 +317,7 @@ contract TreasuryVault is Initializable, SimpleOwnable {
         uint256 investorShare,
         uint256 daoShare
     ) external {
-        require(msg.sender == governance, "Not governance");
+        require(msg.sender == governance || msg.sender == owner(), "Not governance or owner");
         require(builderShare + investorShare + daoShare == 10000, "Must equal 100%");
         
         revenueAllocations[ideaId] = RevenueAllocation({
@@ -363,7 +362,7 @@ contract TreasuryVault is Initializable, SimpleOwnable {
         address[] calldata recipients,
         uint256[] calldata amounts
     ) external returns (bool) {
-        require(msg.sender == governance, "Not governance");
+        require(msg.sender == governance || msg.sender == owner(), "Not governance or owner");
         require(recipients.length == amounts.length, "Length mismatch");
         
         RevenueAllocation storage allocation = revenueAllocations[ideaId];

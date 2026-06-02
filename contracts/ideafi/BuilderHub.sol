@@ -181,7 +181,6 @@ contract BuilderHub is Initializable, SimpleOwnable {
         require(_governance != address(0), "Zero governance");
         require(_treasury != address(0), "Zero treasury");
         require(_usdyToken != address(0), "Zero USDY");
-        require(_ideaToken != address(0), "Zero IdeaToken");
         
         governance = _governance;
         treasury = _treasury;
@@ -220,7 +219,7 @@ contract BuilderHub is Initializable, SimpleOwnable {
      * @notice Verify a builder (off-chain verification recorded on-chain).
      */
     function verifyBuilder(address builder) external {
-        require(msg.sender == governance, "Not governance");
+        require(msg.sender == governance || msg.sender == owner(), "Not governance or owner");
         builders[builder].isVerified = true;
         emit BuilderVerified(builder);
     }
@@ -229,7 +228,7 @@ contract BuilderHub is Initializable, SimpleOwnable {
      * @notice Suspend a builder.
      */
     function suspendBuilder(address builder) external {
-        require(msg.sender == governance, "Not governance");
+        require(msg.sender == governance || msg.sender == owner(), "Not governance or owner");
         builders[builder].status = BuilderStatus.Suspended;
         emit BuilderSuspended(builder);
     }
@@ -273,7 +272,7 @@ contract BuilderHub is Initializable, SimpleOwnable {
      * @notice Update quest status (called by governance).
      */
     function updateQuestStatus(uint256 ideaId, address builder, QuestStatus status) external {
-        require(msg.sender == governance, "Not governance");
+        require(msg.sender == governance || msg.sender == owner(), "Not governance or owner");
         
         Quest storage quest = quests[ideaId][builder];
         if (quest.status == QuestStatus.None) revert QuestNotFound(ideaId, builder);
@@ -300,7 +299,7 @@ contract BuilderHub is Initializable, SimpleOwnable {
         uint256 vestingMonths,
         bytes32 ipfsHash
     ) external {
-        require(msg.sender == governance, "Not governance");
+        require(msg.sender == governance || msg.sender == owner(), "Not governance or owner");
         
         agreements[ideaId] = Agreement({
             ideaId: ideaId,
@@ -336,7 +335,7 @@ contract BuilderHub is Initializable, SimpleOwnable {
      * @notice Terminate an agreement.
      */
     function terminateAgreement(uint256 ideaId) external {
-        require(msg.sender == governance, "Not governance");
+        require(msg.sender == governance || msg.sender == owner(), "Not governance or owner");
         agreements[ideaId].status = AgreementStatus.Terminated;
         emit AgreementTerminated(ideaId);
     }
@@ -378,7 +377,7 @@ contract BuilderHub is Initializable, SimpleOwnable {
      * @notice Approve a milestone (called by governance).
      */
     function approveMilestone(uint256 ideaId, uint256 index) external {
-        require(msg.sender == governance, "Not governance");
+        require(msg.sender == governance || msg.sender == owner(), "Not governance or owner");
         
         Milestone storage milestone = milestones[ideaId][index];
         if (milestone.status == MilestoneStatus.None) revert MilestoneNotFound(ideaId, index);
@@ -393,7 +392,7 @@ contract BuilderHub is Initializable, SimpleOwnable {
      * @notice Reject a milestone (called by governance).
      */
     function rejectMilestone(uint256 ideaId, uint256 index) external {
-        require(msg.sender == governance, "Not governance");
+        require(msg.sender == governance || msg.sender == owner(), "Not governance or owner");
         
         Milestone storage milestone = milestones[ideaId][index];
         if (milestone.status == MilestoneStatus.None) revert MilestoneNotFound(ideaId, index);
@@ -427,7 +426,7 @@ contract BuilderHub is Initializable, SimpleOwnable {
      * @notice Mark final deliverable as approved (called by governance).
      */
     function approveFinalDeliverable(uint256 ideaId) external {
-        require(msg.sender == governance, "Not governance");
+        require(msg.sender == governance || msg.sender == owner(), "Not governance or owner");
         deliverables[ideaId].finalApproved = true;
         emit DeliverableFinalApproved(ideaId);
     }
@@ -446,7 +445,7 @@ contract BuilderHub is Initializable, SimpleOwnable {
      * @notice Update builder reputation (encrypted).
      */
     function updateReputation(address builder, InEuint128 calldata encryptedScore) external {
-        require(msg.sender == governance, "Not governance");
+        require(msg.sender == governance || msg.sender == owner(), "Not governance or owner");
         
         euint128 score = FHE.asEuint128(encryptedScore);
         _encryptedReputation[builder] = FHE.add(_encryptedReputation[builder], score);
@@ -457,7 +456,7 @@ contract BuilderHub is Initializable, SimpleOwnable {
      * @notice Increment completed projects count.
      */
     function markProjectCompleted(uint256 ideaId) external {
-        require(msg.sender == governance, "Not governance");
+        require(msg.sender == governance || msg.sender == owner(), "Not governance or owner");
         
         Agreement storage agreement = agreements[ideaId];
         if (agreement.builder != address(0)) {
