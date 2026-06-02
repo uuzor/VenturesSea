@@ -5,7 +5,7 @@ import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {FHE, euint64, InEuint64, ebool} from "@fhenixprotocol/cofhe-contracts/FHE.sol";
-import "./IIdeaFi.sol";
+import "../interfaces/IIdeaFi.sol";
 
 /**
  * @title ConfidentialBuilderAgreement

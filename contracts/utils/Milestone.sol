@@ -2,7 +2,7 @@
 pragma solidity 0.8.28;
 
 import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
-import "./IIdeaFi.sol";
+import "../interfaces/IIdeaFi.sol";
 
 // ---------------------------------------------------------------------------
 // Milestone

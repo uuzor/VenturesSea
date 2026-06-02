@@ -3,7 +3,7 @@ pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import {FHE, euint64, euint128, ebool, InEuint64, InEuint128} from "@fhenixprotocol/cofhe-contracts/FHE.sol";
-import "./IIdeaFi.sol";
+import "../interfaces/IIdeaFi.sol";
 
 /**
  * @title ConfidentialMilestone

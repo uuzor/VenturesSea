@@ -4,11 +4,11 @@ pragma solidity ^0.8.25;
 import "@openzeppelin/contracts/proxy/Clones.sol";
 import "./ConfidentialIdeaToken.sol";
 import "./ConfidentialFundingPool.sol";
-import "./ConfidentialBuilderAgreement.sol";
+import "../archived/ConfidentialBuilderAgreement.sol";
 import "./ConfidentialIdeaDAO.sol";
 import "./ConfidentialRevenueReport.sol";
 import "./ConfidentialMilestone.sol";
-import "./SimpleOwnable.sol";
+import "../utils/SimpleOwnable.sol";
 
 /**
  * @title ConfidentialIdeaFactory

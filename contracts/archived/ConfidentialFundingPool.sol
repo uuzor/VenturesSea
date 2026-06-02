@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import "../utils/ReentrancyGuard.sol";
 import {FHE, euint8, euint16, euint32, euint64, euint128, InEuint64, ebool, eaddress} from "@fhenixprotocol/cofhe-contracts/FHE.sol";
-import "./IIdeaFi.sol";
+import "../interfaces/IIdeaFi.sol";
 
 /**
  * @title ConfidentialFundingPool

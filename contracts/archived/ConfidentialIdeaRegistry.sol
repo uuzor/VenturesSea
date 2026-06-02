@@ -2,7 +2,7 @@
 pragma solidity ^0.8.25;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "./IIdeaFi.sol";
+import "../interfaces/IIdeaFi.sol";
 
 /**
  * @title ConfidentialIdeaRegistry

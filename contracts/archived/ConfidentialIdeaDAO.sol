@@ -4,7 +4,7 @@ pragma solidity ^0.8.25;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import {FHE, euint8, euint16, euint32, euint64, euint128, InEuint64, ebool, eaddress, ITaskManager, Common, Utils, FunctionId} from "@fhenixprotocol/cofhe-contracts/FHE.sol";
-import "./IIdeaFi.sol";
+import "../interfaces/IIdeaFi.sol";
 
 /**
  * @title ConfidentialIdeaDAO
